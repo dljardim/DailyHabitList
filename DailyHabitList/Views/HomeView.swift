@@ -113,9 +113,31 @@ struct AddHabitView: View {
 
 
 struct HomeView: View {
-    @Query private var habits: [Habit]
+    
     @Environment(\.modelContext) private var modelContext
+    @State private var habits: [Habit] = []
+    
+    // State variables stay the same
+    @State private var searchText = ""
+    @State private var sortAscending = true
     @State private var activeSheet: ActiveSheet?
+    
+    private func fetchHabits() {
+        let descriptor = FetchDescriptor<Habit>(
+            predicate: searchText.isEmpty ? nil :
+                #Predicate { $0.title.localizedStandardContains(searchText) },
+            sortBy: [
+                SortDescriptor(\.title, order: sortAscending ? .forward : .reverse)
+            ]
+        )
+        
+        do {
+            habits = try modelContext.fetch(descriptor)
+        } catch {
+            print("Error fetching habits: \(error.localizedDescription)")
+        }
+    }
+
     
     var body: some View {
         NavigationStack {
@@ -150,7 +172,17 @@ struct HomeView: View {
             }
             .padding()
             .navigationTitle("Today")
+            .searchable(text: $searchText, prompt: "Search habits")
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(sortAscending ? "Sort Z → A" : "Sort A → Z") {
+                            sortAscending.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         activeSheet = .add
@@ -159,20 +191,19 @@ struct HomeView: View {
                     }
                 }
             }
-        }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-                case .add:
-                    AddHabitView()
-                case .edit(let habit):
-                    EditHabitView(habit: habit)
+            .onChange(of: searchText) { fetchHabits() }
+            .onChange(of: sortAscending) { fetchHabits() }
+            
+            .onAppear(perform: fetchHabits)
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                    case .add:
+                        AddHabitView()
+                    case .edit(let habit):
+                        EditHabitView(habit: habit)
+                }
             }
         }
     }
-}
 
-
-
-#Preview{
-    HomeView()
 }
