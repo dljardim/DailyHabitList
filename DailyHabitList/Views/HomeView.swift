@@ -1,13 +1,19 @@
 import SwiftUI
 import SwiftData
 
-// TODO: add swfitdata
-
-struct Habit: Identifiable, Equatable {
-    let id: UUID = UUID()
+@Model
+class Habit {
+    @Attribute(.unique) var id: UUID
     var title: String
-    var isCompleted: Bool = false
+    var isCompleted: Bool
+    
+    init(id: UUID = UUID(), title: String, isCompleted: Bool = false) {
+        self.id = id
+        self.title = title
+        self.isCompleted = isCompleted
+    }
 }
+
 
 enum ActiveSheet: Identifiable {
     case add, edit(Habit)
@@ -21,8 +27,9 @@ enum ActiveSheet: Identifiable {
         }
     }
 }
+
 struct HabitRow: View {
-    @Binding var habit: Habit
+    @Bindable var habit: Habit
     
     var body: some View {
         HStack {
@@ -42,20 +49,73 @@ struct HabitRow: View {
     }
 }
 
+struct EditHabitView: View {
+    @Environment(\.dismiss) var dismiss
+    @Bindable var habit: Habit
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Habit name", text: $habit.title)
+            }
+            .navigationTitle("Edit Habit")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+struct AddHabitView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) var dismiss
+    @State private var title: String = ""
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("New Habit")) {
+                    TextField("Enter habit name", text: $title)
+                }
+            }
+            .navigationTitle("Add Habit")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let newHabit = Habit(title: title)
+                        modelContext.insert(newHabit)
+                        dismiss()
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+
+
+
 
 struct HomeView: View {
-    
-    
-    @State private var habits: [Habit]
+    @Query private var habits: [Habit]
+    @Environment(\.modelContext) private var modelContext
     @State private var activeSheet: ActiveSheet?
-    
-    init(habits: [Habit] = [
-        Habit(title: "Morning walk"),
-        Habit(title: "Read 10 pages"),
-        Habit(title: "Drink water")
-    ]) {
-        _habits = State(initialValue: habits)
-    }
     
     var body: some View {
         NavigationStack {
@@ -69,13 +129,11 @@ struct HomeView: View {
                     .padding(.bottom)
                 
                 List {
-                    ForEach($habits) { $habit in
-                        HabitRow(habit: $habit)
+                    ForEach(habits) { habit in
+                        HabitRow(habit: habit)
                             .swipeActions {
                                 Button(role: .destructive) {
-                                    if let index = habits.firstIndex(where: { $0.id == habit.id }) {
-                                        habits.remove(at: index)
-                                    }
+                                    modelContext.delete(habit)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -93,7 +151,7 @@ struct HomeView: View {
             .padding()
             .navigationTitle("Today")
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         activeSheet = .add
                     } label: {
@@ -105,75 +163,15 @@ struct HomeView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
                 case .add:
-                    AddHabitView(habits: $habits)
+                    AddHabitView()
                 case .edit(let habit):
-                    if let index = habits.firstIndex(where: { $0.id == habit.id }) {
-                        EditHabitView(habit: $habits[index])
-                    } else {
-                        Text("Habit not found")
-                    }
-            }
-        }
-    }
-    
-    struct EditHabitView: View {
-        @Binding var habit: Habit
-        @Environment(\.dismiss) var dismiss
-        
-        var body: some View {
-            NavigationStack {
-                Form {
-                    Section(header: Text("Edit Habit")) {
-                        TextField("Habit name", text: $habit.title)
-                    }
-                }
-                .navigationTitle("Edit Habit")
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            dismiss()
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    
-    
-    struct AddHabitView: View {
-        @Environment(\.dismiss) var dismiss
-        @Binding var habits: [Habit]
-        
-        @State private var title: String = ""
-        
-        var body: some View {
-            NavigationStack {
-                Form {
-                    Section(header: Text("New Habit")) {
-                        TextField("Enter habit name", text: $title)
-                    }
-                }
-                .navigationTitle("Add Habit")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            let newHabit = Habit(title: title)
-                            habits.append(newHabit)
-                            dismiss()
-                        }
-                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                }
+                    EditHabitView(habit: habit)
             }
         }
     }
 }
+
+
 
 #Preview{
     HomeView()

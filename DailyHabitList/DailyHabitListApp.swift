@@ -1,17 +1,12 @@
-//
-//  DailyHabitListApp.swift
-//  DailyHabitList
-//
-//  Created by Damian Jardim on 5/16/25.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct DailyHabitListApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            HomeView()
         }
+        .modelContainer(for: Habit.self)
     }
 }
